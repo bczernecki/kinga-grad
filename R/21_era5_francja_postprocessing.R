@@ -43,22 +43,13 @@ writeRaster(hsi, filename = "hsi.tif")
 (terra::scale(lghail, 0))
 
 library(tmap)
-
-kolory = colorRampPalette(c("orange", "yellow", "white",  "lightblue"))
-tm_shape(raster(hsi)) + tm_raster()
-
-
-przedzialy <- c(6:26)*50
-kolory <- rev(rainbow(20))
-plot(r, breaks=przedzialy, col=colorRampPalette(kolory)(length(przedzialy)))
-
+# zmiana formatu na gadajacy z tmapem:
 fr_bnd2 = sf::st_as_sf(fr_bnd)
 fr2 = sf::st_as_sf(fr)
 
-# rysowanie:
+# rysowanie HSI:
   tm_shape(fr_bnd2)+
   tm_borders() + # just for start to have extent:
-#  tm_text("NAME_1") +
   tm_layout(legend.outside.size = 0.15, legend.outside.position = "right", legend.outside = TRUE,
             legend.frame = FALSE, frame = FALSE) +
   tm_layout(title = "HSI", bg.color = "gray90") +
@@ -81,3 +72,116 @@ fr2 = sf::st_as_sf(fr)
 
   print(p)
 tmap_save(tm = p, filename = "hsi.png")
+
+# rysowanie LGHAIL:
+tm_shape(fr_bnd2)+
+  tm_borders() + # just for start to have extent:
+  tm_layout(legend.outside.size = 0.15, legend.outside.position = "right", legend.outside = TRUE,
+            legend.frame = FALSE, frame = FALSE) +
+  tm_layout(title = "LGHAIL", bg.color = "gray90") +
+  tm_graticules(n.x = 6, n.y = 5, col= "white") +
+  tm_scale_bar(breaks = c(0, 100, 200), position = c("left", "bottom")) +
+  tm_compass(position = c("left", "top"), size = 2) +
+  tm_shape(raster(lghail)) +
+  tm_raster(interpolate = FALSE,
+            title = "(Large Hail Index)",
+            #palette = "viridis",
+            pal = c("#E1F5C4", "#EDE574", "#F9D423", "#FC913A", "#FF4E50", "purple"),
+            style = 'pretty',
+            n = 20,
+            legend.is.portrait = TRUE,
+            labels = as.character(sprintf("%.1f", seq(11,29,1)))) +
+  tm_shape(fr_bnd2)+
+  tm_borders() +
+  tm_shape(fr2, col = "black")+
+  tm_polygons(alpha = 0.10) -> p
+
+print(p)
+tmap_save(tm = p, filename = "lghail.png")
+
+
+# rysowanie SHIP:
+tm_shape(fr_bnd2)+
+  tm_borders() + # just for start to have extent:
+  tm_layout(legend.outside.size = 0.15, legend.outside.position = "right", legend.outside = TRUE,
+            legend.frame = FALSE, frame = FALSE) +
+  tm_layout(title = "SHIP", bg.color = "gray90") +
+  tm_graticules(n.x = 6, n.y = 5, col= "white") +
+  tm_scale_bar(breaks = c(0, 100, 200), position = c("left", "bottom")) +
+  tm_compass(position = c("left", "top"), size = 2) +
+  tm_shape(raster(ship)) +
+  tm_raster(interpolate = FALSE,
+            title = "(Significant Hail Parameter)",
+            #palette = "viridis",
+            pal = c("#E1F5C4", "#EDE574", "#F9D423", "#FC913A", "#FF4E50", "purple"),
+            style = 'pretty',
+            n = 20,
+            legend.is.portrait = TRUE,
+            labels = as.character(sprintf("%.2f", seq(0.0,0.8,0.05)))) +
+  tm_shape(fr_bnd2)+
+  tm_borders() +
+  tm_shape(fr2, col = "black")+
+  tm_polygons(alpha = 0.10) -> p
+
+print(p)
+tmap_save(tm = p, filename = "ship.png")
+
+
+# na koniec zrobic skalowanie i synteze 3 produktow:
+hsi_scaled = ((scale(hsi)+2.35)/5.072654)
+lghail_scaled = ((scale(lghail)+3.57)/6.99)
+ship_scaled = ((scale(ship) + 1.95) / 6.63)
+
+synteza = (hsi_scaled + lghail_scaled + ship_scaled) / 3
+synteza
+plot(synteza)
+writeRaster(synteza, filename = "hail_synthesis_scaled.tif")
+
+# rysowanie syntezy:
+tm_shape(fr_bnd2)+
+  tm_borders() + # just for start to have extent:
+  tm_layout(legend.outside.size = 0.15, legend.outside.position = "right", legend.outside = TRUE,
+            legend.frame = FALSE, frame = FALSE) +
+  tm_layout(title = "HAIL RISK", bg.color = "gray90") +
+  tm_graticules(n.x = 6, n.y = 5, col= "white") +
+  tm_scale_bar(breaks = c(0, 100, 200), position = c("left", "bottom")) +
+  tm_compass(position = c("left", "top"), size = 2) +
+  tm_shape(raster(synteza)) +
+  tm_raster(interpolate = FALSE,
+            title = "(scaled hail indices)",
+            #palette = "viridis",
+            pal = c("#E1F5C4", "#EDE574", "#F9D423", "#FC913A", "#FF4E50", "purple"),
+            style = 'pretty',
+            n = 20,
+            legend.is.portrait = TRUE,
+            labels = as.character(sprintf("%.2f", seq(0, 1, 0.05)))) +
+  tm_shape(fr_bnd2)+
+  tm_borders() +
+  tm_shape(fr2, col = "black")+
+  tm_polygons(alpha = 0.10) -> p
+
+print(p)
+tmap_save(tm = p, filename = "hail_synthesis.png")
+
+
+# podsumowanie statystyczne w regionach
+library(dplyr)
+get_vals = function(input = synteza, index = "synthesis"){
+  e = extract(input, fr, exact=TRUE, cells=TRUE)
+
+  e %>% group_by(ID) %>% summarise(min = min(mean),
+                                   max = max(mean),
+                                   mean = mean(mean)) -> res
+
+  res$provs = fr$NAME_1
+  res$index = index
+  return(res)
+}
+
+wsio = rbind.data.frame(
+get_vals(input = hsi, index = "HSI"),
+get_vals(input = ship, index = "SHIP"),
+get_vals(input = lghail, index = "LGHAIL"),
+get_vals(input = synteza, index = "SYNTHESIS")
+)
+writexl::write_xlsx(wsio, "grad_podsumowanie_tabela.xlsx")
