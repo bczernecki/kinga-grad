@@ -5,7 +5,7 @@
 cd /media/tornado/Seagate_041/ERA5_EU_parameters
 
 
-for i in `seq 1950 2021`
+for i in `seq 1950 1951`
 do
 
 echo $i
@@ -25,4 +25,4 @@ done
 
 #cdo -sellonlatbox,-5.5,10,41,51.5 -selvar,HSI,SHIP,BS_EFF_MU,MU_LI,MU_WMAX,MU_LCL_TEMP,MU_MIXR 1950-01-01_parameters_comp.nc /home/bartosz/grad/1950-01-01_parameters_comp.nc
 
-638*71
+
