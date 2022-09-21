@@ -1,5 +1,5 @@
 library(raster)
-setwd("~/github/kinga-grad/data/hiszpania_wiatr/")
+setwd("~/github/kinga-grad/data/hiszpania_grad/")
 rastry = dir(pattern = "tif")
 
 plot(raster(rastry[1]))
